@@ -1,0 +1,568 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ── 色彩 token：磷光绿 / 血红 ── */
+  --primary: #00ff88;
+  --primary-glow: rgba(0, 255, 136, 0.34);
+  --primary-dim: #0a4d2c;
+  --primary-deep: #03150c;
+  --blood: #ff2b3d;
+  --blood-glow: rgba(255, 43, 61, 0.32);
+  --blood-dim: #7a0d1a;
+  --amber: #ffb000;
+  --amber-glow: rgba(255, 176, 0, 0.3);
+  --amber-dim: #7a5303;
+
+  --surface-void: #030605;
+  --surface-deep: #050b08;
+  --surface-panel: #071009;
+  --surface-elevated: rgba(0, 255, 136, 0.045);
+  --surface-hover: rgba(0, 255, 136, 0.075);
+  --surface-solid: #0b1710;
+
+  --border-subtle: rgba(0, 255, 136, 0.12);
+  --border-strong: rgba(0, 255, 136, 0.26);
+  --border-glow: rgba(0, 255, 136, 0.42);
+
+  --text-dim: #4e6b5c;
+  --text-dark: #7d9b8a;
+  --text-main: #b8d6c4;
+  --text-light: #e8fff3;
+
+  --gradient-primary: linear-gradient(180deg, #00ff88 0%, #00c96b 100%);
+  --gradient-blood: linear-gradient(180deg, #ff2b3d 0%, #b60d1e 100%);
+  --gradient-panel: linear-gradient(180deg, rgba(0, 255, 136, 0.05) 0%, rgba(3, 6, 5, 0) 70%);
+  --shadow-glow: 0 0 28px rgba(0, 255, 136, 0.18);
+  --shadow-blood: 0 0 26px rgba(255, 43, 61, 0.22);
+  --shadow-panel: 0 16px 44px rgba(0, 0, 0, 0.55);
+  --transition-smooth: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── 响应式字号阶梯 ── */
+  --fs-hero: clamp(1.85rem, 5.6vw, 3.2rem);
+  --fs-display: clamp(1.5rem, 4.2vw, 2.35rem);
+  --fs-heading: clamp(1.15rem, 3vw, 1.6rem);
+  --fs-subheading: clamp(1rem, 2.1vw, 1.22rem);
+  --fs-stat: clamp(1.35rem, 4.4vw, 2.05rem);
+  --fs-body: clamp(0.86rem, 1.25vw, 0.96rem);
+  --fs-small: clamp(0.75rem, 1vw, 0.82rem);
+  --fs-tiny: clamp(0.68rem, 0.92vw, 0.74rem);
+
+  /* ── 响应式间距 ── */
+  --section-py: clamp(1.6rem, 5vw, 3rem);
+  --section-px: clamp(1rem, 4vw, 2rem);
+  --gap-fluid: clamp(0.7rem, 1.7vw, 1.15rem);
+  --sidebar-w: 244px;
+  --container-max: 1500px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: 'IBM Plex Mono', 'Noto Sans SC', ui-monospace, monospace;
+  background: var(--surface-void);
+  color: var(--text-main);
+  overflow-x: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  font-size: var(--fs-body);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.01em;
+  background-image:
+    radial-gradient(1000px 480px at 82% -10%, rgba(0, 255, 136, 0.075), transparent 62%),
+    radial-gradient(680px 420px at 4% 104%, rgba(255, 43, 61, 0.05), transparent 60%),
+    linear-gradient(rgba(0, 255, 136, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 136, 0.035) 1px, transparent 1px);
+  background-size: auto, auto, 32px 32px, 32px 32px;
+  background-attachment: fixed;
+}
+
+/* ── CRT：全屏扫描线 + 噪点 + 暗角（纯装饰，不影响排版） ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0, 255, 136, 0.035) 0px,
+    rgba(0, 255, 136, 0.035) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  animation: flicker 4.5s steps(1, end) infinite;
+}
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9001;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.55) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  opacity: 0.32;
+  mix-blend-mode: overlay;
+}
+/* 想安静干活的人：给 html 加 .crt-off 就干净了 */
+html.crt-off body::before,
+html.crt-off body::after { display: none; }
+
+h1, h2, h3, h4, h5 {
+  font-family: 'Share Tech Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+::selection { background: rgba(0, 255, 136, 0.3); color: #eafff3; }
+
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: var(--surface-deep); }
+::-webkit-scrollbar-thumb { background: #16341f; border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary-dim); }
+
+@layer components {
+  /* ── 作战面板：硬直角 + 四角括号 + 刻度 ── */
+  .hud-panel {
+    position: relative;
+    border-radius: 2px;
+    border: 1px solid var(--border-subtle);
+    background:
+      linear-gradient(180deg, rgba(7, 16, 9, 0.94) 0%, rgba(3, 6, 5, 0.94) 100%);
+    transition: var(--transition-smooth);
+    min-width: 0;
+  }
+  .hud-panel::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: -1px;
+    width: 13px; height: 13px;
+    border-top: 2px solid var(--border-glow);
+    border-left: 2px solid var(--border-glow);
+    pointer-events: none;
+  }
+  .hud-panel::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; right: -1px;
+    width: 13px; height: 13px;
+    border-bottom: 2px solid rgba(0, 255, 136, 0.22);
+    border-right: 2px solid rgba(0, 255, 136, 0.22);
+    pointer-events: none;
+  }
+  .hud-panel-hover:hover {
+    border-color: var(--border-glow);
+    box-shadow: var(--shadow-glow);
+    transform: translateY(-2px);
+  }
+  /* 告警态面板：整块转红 */
+  .hud-panel-alert {
+    border-color: rgba(255, 43, 61, 0.38);
+    background: linear-gradient(180deg, rgba(30, 5, 9, 0.9) 0%, rgba(5, 3, 3, 0.95) 100%);
+  }
+  .hud-panel-alert::before { border-color: var(--blood-glow); }
+  .hud-panel-alert::after { border-color: rgba(255, 43, 61, 0.35); }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem clamp(0.7rem, 2vw, 1.05rem);
+    border-bottom: 1px solid var(--border-subtle);
+    background: linear-gradient(90deg, rgba(0, 255, 136, 0.07), transparent 72%);
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    font-size: var(--fs-small);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dark);
+  }
+  .panel-head-raw {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem clamp(0.7rem, 2vw, 1.05rem);
+    border-bottom: 1px solid var(--border-subtle);
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    font-size: var(--fs-small);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dark);
+  }
+  /* 命令行式小标题：> 前缀 */
+  .cmd-label {
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    color: var(--text-dark);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: var(--fs-tiny);
+  }
+  .cmd-label::before {
+    content: '> ';
+    color: var(--primary);
+    opacity: 0.75;
+  }
+
+  /* ── 按钮：终端硬块 ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 2px;
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    font-size: var(--fs-small);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.5rem 0.85rem;
+    transition: var(--transition-smooth);
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary {
+    background: var(--gradient-primary);
+    border-color: #00ff88;
+    color: #02170d;
+    font-weight: 700;
+    box-shadow: 0 0 16px rgba(0, 255, 136, 0.22);
+  }
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 0 28px rgba(0, 255, 136, 0.48);
+    filter: brightness(1.08);
+  }
+  .btn-ghost {
+    background: var(--surface-elevated);
+    border-color: var(--border-subtle);
+    color: var(--text-main);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    border-color: var(--border-glow);
+    color: var(--primary);
+    background: var(--surface-hover);
+    box-shadow: inset 0 0 18px rgba(0, 255, 136, 0.08);
+  }
+  .btn-danger {
+    background: rgba(255, 43, 61, 0.1);
+    border-color: rgba(255, 43, 61, 0.42);
+    color: #ff8a94;
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: rgba(255, 43, 61, 0.2);
+    color: #ffb3ba;
+    box-shadow: 0 0 20px rgba(255, 43, 61, 0.25);
+  }
+  .btn-accent {
+    background: rgba(255, 176, 0, 0.1);
+    border-color: rgba(255, 176, 0, 0.4);
+    color: var(--amber);
+  }
+  .btn-accent:hover:not(:disabled) { background: rgba(255, 176, 0, 0.2); }
+  .btn-sm { padding: 0.32rem 0.6rem; font-size: var(--fs-tiny); }
+
+  /* ── 表单：终端输入行 ── */
+  .field {
+    width: 100%;
+    background: rgba(2, 5, 3, 0.85);
+    border: 1px solid var(--border-subtle);
+    border-radius: 2px;
+    color: var(--primary);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: var(--fs-small);
+    padding: 0.55rem 0.7rem;
+    transition: var(--transition-smooth);
+    outline: none;
+  }
+  .field:focus {
+    border-color: var(--border-glow);
+    box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.09), inset 0 0 12px rgba(0, 255, 136, 0.06);
+  }
+  .field::placeholder { color: #37503f; }
+  .field-label {
+    display: block;
+    font-size: var(--fs-tiny);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 0.35rem;
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+  }
+  select.field option { background: #050b08; color: var(--text-light); }
+
+  /* ── 徽标 ── */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 2px;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-elevated);
+    padding: 0.14rem 0.44rem;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: var(--fs-tiny);
+    color: var(--text-dark);
+    white-space: nowrap;
+  }
+
+  /* ── 数据表：带行号，像 dump ── */
+  .data-table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); counter-reset: rownum; }
+  .data-table th {
+    text-align: left;
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    font-size: var(--fs-tiny);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--border-subtle);
+    background: rgba(0, 255, 136, 0.03);
+    white-space: nowrap;
+  }
+  .data-table td {
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid rgba(0, 255, 136, 0.06);
+    color: var(--text-main);
+    vertical-align: middle;
+  }
+  .data-table tbody tr:hover td { background: rgba(0, 255, 136, 0.05); }
+  .data-table tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--primary); }
+
+  /* ── 终端窗口 ── */
+  .terminal {
+    background: #020503;
+    border: 1px solid var(--border-subtle);
+    border-left: 2px solid rgba(0, 255, 136, 0.3);
+    border-radius: 2px;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: var(--fs-tiny);
+    line-height: 1.7;
+    color: #8dffc8;
+    padding: 0.65rem 0.75rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-break: break-all;
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.25);
+  }
+  .terminal-line-dim { color: #3f5c4a; }
+  .terminal-line-warn { color: var(--amber); }
+  .terminal-line-err { color: #ff6b78; }
+  .terminal-line-ok { color: #00ff88; }
+
+  .cursor-blink::after {
+    content: '█';
+    animation: blink 1.05s step-end infinite;
+    color: var(--primary);
+    margin-left: 0.15rem;
+  }
+
+  /* ── 响应式骨架 ── */
+  .section-wrap {
+    padding-block: var(--section-py);
+    padding-inline: var(--section-px);
+  }
+  .container-fluid {
+    width: min(100%, var(--container-max));
+    margin-inline: auto;
+    min-width: 0;
+  }
+  .grid-auto {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+    gap: var(--gap-fluid);
+  }
+  .fs-hero { font-size: var(--fs-hero); line-height: 1.06; }
+  .fs-display { font-size: var(--fs-display); line-height: 1.14; }
+  .fs-heading { font-size: var(--fs-heading); line-height: 1.2; }
+  .fs-subheading { font-size: var(--fs-subheading); line-height: 1.3; }
+  .fs-stat { font-size: var(--fs-stat); line-height: 1.05; }
+  .fs-body { font-size: var(--fs-body); }
+  .fs-small { font-size: var(--fs-small); }
+  .fs-tiny { font-size: var(--fs-tiny); }
+
+  .glow-text {
+    color: var(--primary);
+    text-shadow: 0 0 14px rgba(0, 255, 136, 0.5), 0 0 40px rgba(0, 255, 136, 0.18);
+  }
+  .blood-text {
+    color: var(--blood);
+    text-shadow: 0 0 14px rgba(255, 43, 61, 0.5);
+  }
+
+  /* ── 扫描线（面板内移动光带） ── */
+  .scanline { position: relative; overflow: hidden; }
+  .scanline::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 38px;
+    background: linear-gradient(180deg, rgba(0, 255, 136, 0.075), transparent);
+    animation: scan 6s linear infinite;
+    pointer-events: none;
+  }
+
+  /* ── 死角坐标刻度 ── */
+  .ruler-x {
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(0, 255, 136, 0.28) 0 1px,
+      transparent 1px 9px
+    );
+    height: 6px;
+    opacity: 0.6;
+  }
+  .ruler-y {
+    background-image: repeating-linear-gradient(
+      180deg,
+      rgba(0, 255, 136, 0.28) 0 1px,
+      transparent 1px 9px
+    );
+    width: 6px;
+    opacity: 0.6;
+  }
+
+  /* ── glitch 标题 ── */
+  .glitch { position: relative; display: inline-block; }
+  .glitch::before,
+  .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .glitch::before {
+    color: var(--blood);
+    animation: glitch-x 3.4s steps(1, end) infinite;
+    clip-path: polygon(0 2%, 100% 2%, 100% 38%, 0 38%);
+    opacity: 0.55;
+  }
+  .glitch::after {
+    color: #38d9ff;
+    animation: glitch-x 2.7s steps(1, end) infinite reverse;
+    clip-path: polygon(0 62%, 100% 62%, 100% 98%, 0 98%);
+    opacity: 0.45;
+  }
+
+  /* ── 告警 ticker ── */
+  .ticker-wrap {
+    overflow: hidden;
+    border-top: 1px solid rgba(255, 43, 61, 0.28);
+    border-bottom: 1px solid rgba(255, 43, 61, 0.28);
+    background: linear-gradient(90deg, rgba(255, 43, 61, 0.09), rgba(255, 43, 61, 0.02));
+  }
+  .ticker-track {
+    display: inline-flex;
+    white-space: nowrap;
+    animation: ticker 42s linear infinite;
+  }
+  .ticker-track:hover { animation-play-state: paused; }
+
+  /* ── 复核状态机芯片 ── */
+  .state-node {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    border-radius: 2px;
+    border: 1px solid var(--border-subtle);
+    background: rgba(0, 255, 136, 0.05);
+    padding: 0.12rem 0.4rem;
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    font-size: var(--fs-tiny);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dark);
+  }
+  .state-node-active {
+    border-color: var(--border-glow);
+    color: var(--primary);
+    box-shadow: 0 0 12px rgba(0, 255, 136, 0.2);
+  }
+  .state-node-dead {
+    border-color: rgba(255, 43, 61, 0.35);
+    color: #ff8a94;
+    background: rgba(255, 43, 61, 0.08);
+  }
+
+  /* ── kill-chain 阶段条 ── */
+  .killstage {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border-subtle);
+    background: rgba(0, 255, 136, 0.03);
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    font-size: var(--fs-tiny);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: center;
+    overflow: hidden;
+  }
+  .killstage-hot {
+    border-color: var(--border-glow);
+    color: var(--primary);
+    background: rgba(0, 255, 136, 0.1);
+    box-shadow: inset 0 0 18px rgba(0, 255, 136, 0.12);
+  }
+  .killstage-alert {
+    border-color: rgba(255, 43, 61, 0.45);
+    color: #ff8a94;
+    background: rgba(255, 43, 61, 0.1);
+  }
+
+  /* ── 开屏自检 ── */
+  .boot-shell {
+    background: #020503;
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-panel), inset 0 0 90px rgba(0, 255, 136, 0.05);
+  }
+  .ascii-banner {
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    font-size: clamp(0.4rem, 1.5vw, 0.72rem);
+    line-height: 1.12;
+    color: var(--primary);
+    text-shadow: 0 0 12px rgba(0, 255, 136, 0.45);
+    white-space: pre;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+  }
+
+  /* ── 命令面板 ── */
+  .cmd-panel {
+    border: 1px solid var(--border-glow);
+    background: rgba(2, 6, 4, 0.97);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 40px rgba(0, 255, 136, 0.12);
+  }
+  .cmd-item-active {
+    background: rgba(0, 255, 136, 0.1);
+    box-shadow: inset 2px 0 0 var(--primary);
+  }
+
+  /* ── 杂项 ── */
+  .divider-dashed {
+    height: 1px;
+    background-image: repeating-linear-gradient(90deg, rgba(0, 255, 136, 0.24) 0 4px, transparent 4px 9px);
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+}
+
+@media (max-width: 900px) {
+  :root { --section-px: clamp(0.9rem, 4vw, 1.15rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,901 @@
+openapi: 3.1.0
+info:
+  title: ReconLab ↔ PhantomVeil 对接契约
+  version: "2.0.0"
+  description: |
+    授权渗透测试作战台（ReconLab）与验证器 Agent（PhantomVeil）之间**唯一的接触面**。
+
+    契约 v2 相对 v1 的变化（破坏性变更，服务端保留 v1 兼容期）：
+
+    - 新增授权范围（scope）模型：`scope_id` 只是索引，服务端一律按 target/endpoint **现算**匹配
+    - 拉取队列从「一把捞」改为 **claim / heartbeat / release** 显式领取，回收后旧 lease_token 立即作废
+    - `POST /api/verification/queue` 要求 `Idempotency-Key`（客户端生成的稳定 UUID，重试原样复用）
+    - `PATCH /api/verification/queue/{id}` 要求 `If-Match: <etag>`（乐观锁）
+    - 新增证据两步式通道（`POST /api/evidence` → 引用 `evidence_ids`），上传必须带内容摘要
+    - 新增判定准则表（decision rubric）与 `location` 字段
+    - 所有时间一律带时区的 ISO8601；分页用不透明 cursor；429 必带 Retry-After
+
+    **对外状态词只有 5 个**（suspected / testing / confirmed / rejected / inconclusive）。
+    ReconLab 内部的复核状态机（含人工签字位）不对外暴露，Agent 只需认这 5 个。
+
+    词表扩展规则：先改本文件，两边同步，不要各写各的。
+servers:
+  - url: http://127.0.0.1:8090
+    description: 本地控制台（默认端口）
+  - url: https://reconlab-4c03.web.zaka.live
+    description: 控制台前端（/api 同域反代到本地后端）
+
+tags:
+  - name: 验证队列
+    description: 拉取待验证发现、回写判定、并发领取
+  - name: 证据
+    description: 证据两步式上传与取回
+  - name: 授权范围
+    description: 范围查询与逐跳校验
+  - name: 判定准则
+    description: 各漏洞类型的 confirmed / rejected / inconclusive 门槛
+  - name: 契约
+    description: 契约自描述与元信息
+
+security:
+  - agentKey: []
+
+paths:
+
+  /api/verification/queue:
+    get:
+      tags: [验证队列]
+      summary: 拉取待验证队列
+      description: |
+        只用于浏览与挑活；**真正干活前必须 claim**。
+        `state` 是**对外**词表；换成内部状态由服务端判断，Agent 不需要知道。
+      parameters:
+        - name: state
+          in: query
+          schema: { $ref: '#/components/schemas/ExternalState' }
+          description: 不传则返回全部状态
+        - name: kind
+          in: query
+          schema: { type: string }
+          description: 漏洞类型，见判定准则表的 kind
+        - name: target
+          in: query
+          schema: { type: string }
+        - name: scope_id
+          in: query
+          schema: { type: string }
+        - name: severity
+          in: query
+          schema: { type: string, enum: [critical, high, medium, low, info] }
+        - name: since
+          in: query
+          schema: { type: string, format: date-time }
+          description: 只要这个时间之后创建的（带时区）
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: 上一页返回的 next_cursor，原样回传；不要自己拼
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created, '-created', confidence, '-confidence']
+            default: created
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/QueueItem' } }
+                      count: { type: integer }
+                      next_cursor: { type: [string, 'null'] }
+                      rate_limit: { $ref: '#/components/schemas/RateLimit' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+    post:
+      tags: [验证队列]
+      summary: 上报新发现
+      description: |
+        - 必须带 `Idempotency-Key`（稳定 UUID，重试原样复用）
+        - `target` / `endpoint` 必须落在某个 active 授权范围内，否则 403
+        - 端点会被服务端规范化（丢 query/fragment/凭据、小写、去默认端口、折叠路径）
+        - 同 kind + 端点 + 参数 + location 的重复上报会**合并**到已有记录（instances+1）
+        - 要推翻已签字结论，用 `supersedes` 开新记录，不要原地改历史
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FindingInput' }
+      responses:
+        '201':
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      item: { $ref: '#/components/schemas/QueueItem' }
+                      deduplicated: { type: boolean }
+                      rubric_warnings: { type: array, items: { $ref: '#/components/schemas/RubricIssue' } }
+        '200':
+          description: 命中去重或幂等回放（`deduplicated: true`，或响应头 `Idempotent-Replay: true`）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/OutOfScope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/verification/queue/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ItemId'
+    get:
+      tags: [验证队列]
+      summary: 单条详情（只读，拿最新 etag）
+      description: |
+        提交前对齐内容版本的**干净读**，纯只读，目的是把「读」和「租约」彻底分开：
+
+        - **不要求持租约**，不续租、不碰心跳、不改任何字段 → 不会推进 `rev`，也不会动 `etag`
+        - 这里读到的 `etag` 与 `PATCH` 的 `If-Match` **同源**（同一个算法），读到什么就拿什么去写
+        - 已被取代的记录**照常返回**（不像 claim/patch 那样 409），看 `superseded_by` 判断
+        - 带 `If-None-Match: <etag>` 且命中当前版本 → `304` 空体（轮询预检省流量）
+
+        别拿 `claim` 当读接口：`claim` 是写操作，它会续租，租约已过期时还会**换发新 token**
+        （必须用返回值覆盖本地 token，否则继续用旧 token 会吃 409 LEASE_EXPIRED）。
+
+        只读不代表放行写：`claim` / `heartbeat` / `PATCH` 三个写点照样各自现算授权范围。
+        单条的可见范围与 `GET /api/verification/queue` 列表**完全一致**（列表也不按 scope 过滤）：
+        浏览面可以宽，干活必须范围内 —— 越界的记录领不走也写不进，`claim` 会直接 403 / 409。
+      responses:
+        '200':
+          description: 记录详情
+          headers:
+            ETag:
+              schema: { type: string }
+              description: 当前内容版本，可直接用作下一次 PATCH 的 If-Match
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      item: { $ref: '#/components/schemas/QueueItem' }
+        '304':
+          description: If-None-Match 命中当前版本，内容无变化（空体）
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    patch:
+      tags: [验证队列]
+      summary: 回写判定
+      description: |
+        硬要求：
+        - `If-Match: <etag>` 必带，不匹配 412；缺失 428
+        - **必须持有效租约**（先 claim），租约被回收后旧 token 一律 409
+        - `confirmed` 必须带 `reproduction_steps` + 至少一条 `evidence`，并满足判定准则
+        - `suspected` 只能用于非终态记录；人工签字过的终态要用 `supersedes` 重开
+        - 提交点会再校验一次授权范围，中途失效 → 409 SCOPE_EXPIRED（任务作废）
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerdictInput' }
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      item: { $ref: '#/components/schemas/QueueItem' }
+                      rubric_warnings: { type: array, items: { $ref: '#/components/schemas/RubricIssue' } }
+                      rubric: { $ref: '#/components/schemas/Rubric' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412':
+          description: 实体已被更新（内容变了，etag 对不上）
+          headers:
+            ETag:
+              schema: { type: string }
+              description: 服务端当前 content version，等价于 data.current_etag
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          current_etag: { type: string, description: 服务端当前内容版本，可直接当新的 If-Match }
+                          provided: { type: string, description: 本次请求带的 If-Match }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '428':
+          description: 缺少 If-Match
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/verification/queue/{id}/claim:
+    parameters:
+      - $ref: '#/components/parameters/ItemId'
+    post:
+      tags: [验证队列]
+      summary: 显式领取（推荐 lease）
+      description: |
+        领取成功返回 `lease_token`，回写判定与心跳都要带它。
+        他人已领且未超时 → 409 ALREADY_CLAIMED；终态记录 → 409 ALREADY_FINAL。
+        领取前会校验授权范围，越界或过期 → 403 / 409 SCOPE_EXPIRED。
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                worker_id: { type: string, description: 用来显示与审计；同 worker 重复领取会续租 }
+                lease_seconds: { type: integer, minimum: 30, maximum: 3600, default: 900 }
+      responses:
+        '200':
+          description: 领取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      lease_token: { type: string }
+                      lease_expires_at: { type: string, format: date-time }
+                      lease_seconds: { type: integer }
+                      item: { $ref: '#/components/schemas/QueueItem' }
+        '403': { $ref: '#/components/responses/OutOfScope' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/verification/queue/{id}/heartbeat:
+    parameters:
+      - $ref: '#/components/parameters/ItemId'
+    post:
+      tags: [验证队列]
+      summary: 续租
+      description: 必须带当前 lease_token；token 过期或已被回收 → 409 LEASE_EXPIRED。同时会再校验一次授权范围。
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lease_token: { type: string }
+                lease_seconds: { type: integer, minimum: 30, maximum: 3600, default: 900 }
+      responses:
+        '200':
+          description: 续租成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/verification/queue/{id}/release:
+    parameters:
+      - $ref: '#/components/parameters/ItemId'
+    post:
+      tags: [验证队列]
+      summary: 主动释放
+      description: 干不完或发现不对，把记录退回待验证，让别人能领。
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lease_token: { type: string }
+                reason: { type: string }
+      responses:
+        '200':
+          description: 已释放
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/evidence:
+    post:
+      tags: [证据]
+      summary: 上传证据（第一步）
+      description: |
+        定死这一个通道：JSON + base64（不带 multipart 的「或」）。
+
+        ```json
+        { "content_base64": "<文件字节的 base64>", "content_type": "text/plain",
+          "kind": "http_exchange", "note": "对照组未跳转", "filename": "exchange.txt" }
+        ```
+
+        **必须带内容摘要**（Content-Digest 或 X-Content-SHA256 或 body.sha256），
+        指的是**证据文件内容**的 sha-256（不是 HTTP body 的）。
+        服务端收下来算一次、落盘后回读再算一次，对不上直接拒收。
+
+        同一 sha256 只留一条记录（内容寻址），重复上传返回已有 id（`deduplicated: true`）。
+      parameters:
+        - $ref: '#/components/parameters/ContentDigest'
+        - name: X-Content-SHA256
+          in: header
+          schema: { type: string, pattern: '^[0-9a-fA-F]{64}$' }
+          description: Content-Digest 的替代写法（hex）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content_base64]
+              properties:
+                content_base64: { type: string }
+                content_type: { type: string, default: application/octet-stream }
+                kind: { type: string, examples: [http_exchange, screenshot, timing_sample, callback_log] }
+                note: { type: string }
+                filename: { type: string }
+                sha256: { type: string, pattern: '^[0-9a-fA-F]{64}$' }
+      responses:
+        '201':
+          description: 已存证
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      evidence: { $ref: '#/components/schemas/Evidence' }
+                      deduplicated: { type: boolean }
+                      digest_verified: { type: boolean }
+        '200':
+          description: 同内容已存在，直接复用
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413':
+          description: 单条证据超过 16MB
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/evidence/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [证据]
+      summary: 证据元数据
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      evidence: { $ref: '#/components/schemas/Evidence' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/evidence/{id}/raw:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [证据]
+      summary: 取回证据内容（base64）
+      description: 返回 `content_base64` 与自算 sha256，可用 `sha256_match` 判断字节是否一致。超过 12MB 请用元数据里的 file_url 在控制台查看。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      evidence_id: { type: string }
+                      content_base64: { type: string }
+                      size: { type: integer }
+                      content_type: { type: string }
+                      sha256: { type: string }
+                      sha256_match: { type: boolean }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413':
+          description: 超出内联下载上限
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/scopes:
+    get:
+      tags: [授权范围]
+      summary: 列出授权范围
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, expired] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/Scope' } }
+                      next_cursor: { type: [string, 'null'] }
+
+  /api/scopes/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [授权范围]
+      summary: 单个授权范围
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      scope: { $ref: '#/components/schemas/Scope' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/scope/check:
+    post:
+      tags: [授权范围]
+      summary: 范围校验（重定向逐跳用这个）
+      description: |
+        重定向链路**每一跳都要单独过一遍**，任何一跳越界立刻中止，不要继续跟。
+        `urls` 里给整条跳转链，返回逐跳结果；有任意一跳不在范围内 → 403（`in_scope: false`）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url: { type: string }
+                urls:
+                  type: array
+                  items: { type: string }
+                target: { type: string }
+                scope_id: { type: string }
+      responses:
+        '200':
+          description: 全部在范围内
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      in_scope: { type: boolean }
+                      hop_count: { type: integer }
+                      results:
+                        type: array
+                        items: { $ref: '#/components/schemas/ScopeHop' }
+        '403':
+          description: 有跳转越界
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/rubrics:
+    get:
+      tags: [判定准则]
+      summary: 全部判定准则
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/Rubric' } }
+
+  /api/rubrics/{kind}:
+    parameters:
+      - name: kind
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [判定准则]
+      summary: 单个漏洞类型的判定门槛
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      rubric: { $ref: '#/components/schemas/Rubric' }
+                      exact_match: { type: boolean, description: false 表示落到了 default 兜底准则 }
+
+  /api/contract/meta:
+    get:
+      tags: [契约]
+      summary: 契约自描述
+      description: 词表、状态映射、限制、错误码、端点清单。写 Agent 先读这个。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+
+components:
+
+  securitySchemes:
+    agentKey:
+      type: http
+      scheme: bearer
+      description: |
+        Agent 专用 API Key（`rlk_` 开头），在控制台 /agent 页创建身份时生成一次。
+        库里只存 sha256(key)。控制台账号密码登录**不属于**契约通道。
+
+  parameters:
+    ItemId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: 记录 id
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 200 }
+      description: 客户端生成的稳定 UUID；重试时**原样复用**，不要用内容哈希
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema: { type: string }
+      description: 上一次读到的 etag（形如 "abc123-3"）
+    ContentDigest:
+      name: Content-Digest
+      in: header
+      schema: { type: string }
+      description: 'RFC 9530 格式，sha-256=:BASE64:（针对证据文件内容）'
+
+  responses:
+    BadRequest:
+      description: 请求不合法
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: 未鉴权或 Key 无效
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: 记录不存在
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    OutOfScope:
+      description: 目标不在授权范围内（scope_id 只是索引，服务端按 target/endpoint 现算）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: 冲突（租约/幂等/终态/状态迁移）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: 字段不合法或违反判定准则
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: 触发限流，按 Retry-After 退避
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: 建议退避秒数
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+
+    Envelope:
+      type: object
+      required: [contract_version]
+      properties:
+        contract_version: { type: integer, const: 2 }
+        rate_limit: { $ref: '#/components/schemas/RateLimit' }
+
+    RateLimit:
+      type: object
+      properties:
+        limit: { type: integer, examples: [60] }
+        remaining: { type: integer }
+        reset_seconds: { type: integer }
+
+    ExternalState:
+      type: string
+      enum: [suspected, testing, confirmed, rejected, inconclusive]
+      description: |
+        对外契约状态（唯一词表）：
+        - `suspected` 待验证（可领取）
+        - `testing` 验证中（被领取 / 平台复核进行中）
+        - `confirmed` 已确认（终态）
+        - `rejected` 已否定（终态，通常是输出被编码/转义/不可达）
+        - `inconclusive` 无法判定（环境受限 / 未投递成功）
+        站内更细的复核状态不对外暴露，见 `review_status`。
+
+    QueueItem:
+      type: object
+      properties:
+        id: { type: string }
+        kind: { type: string, description: 漏洞类型（对齐 PhantomVeil 插件 id） }
+        state: { $ref: '#/components/schemas/ExternalState' }
+        review_status:
+          type: string
+          enum: [not_started, pending_platform_review, signed_off, unknown]
+          description: 信息性字段，表示平台侧复核进度
+        title: { type: string }
+        target: { type: string }
+        target_id: { type: string }
+        scope_id: { type: string }
+        endpoint: { type: string, description: 规范化端点（无 query / 无凭据） }
+        endpoint_raw: { type: string }
+        location:
+          type: string
+          enum: [query, body, header, cookie, path, '']
+          description: 参数位置（IDOR / 越权类必须给）
+        parameter: { type: string }
+        severity: { type: string, enum: [critical, high, medium, low, info, ''] }
+        confidence: { type: integer, minimum: 0, maximum: 100 }
+        tier: { type: string, enum: [confirmed, suspect, noise, ''] }
+        origin: { type: string, enum: [agent, scanner, manual, ''] }
+        agent_name: { type: string, description: 服务端按 Key 反推，忽略客户端自填 }
+        dedup_hash: { type: string }
+        instances: { type: integer }
+        evidence: { type: array, items: { $ref: '#/components/schemas/EvidenceRef' } }
+        evidence_note: { type: string, description: 老数据里的自由文本证据说明 }
+        raw_request: { type: string }
+        raw_response: { type: string }
+        curl: { type: string }
+        reproduction_steps: { type: array, items: { type: string } }
+        verdict_note: { type: string }
+        checks:
+          type: array
+          description: 复核检查项状态（reproduce / control / cross / active / side / waf）
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              state: { type: string, enum: [pass, fail, todo, na] }
+              note: { type: string }
+        attempts: { type: integer }
+        verified_at: { type: [string, 'null'], format: date-time }
+        rev: { type: integer, description: 服务端实体版本（内容变了才加） }
+        etag: { type: string, description: 回写时要放进 If-Match }
+        lease:
+          type: object
+          properties:
+            active: { type: boolean }
+            holder: { type: string }
+            expires_at: { type: [string, 'null'], format: date-time }
+        supersedes: { type: string, description: 本记录取代了哪条旧记录 }
+        superseded_by: { type: string, description: 本记录被哪条新记录取代（有值即冻结） }
+        reopened_reason: { type: string }
+        created: { type: string, format: date-time }
+        updated: { type: string, format: date-time }
+
+    FindingInput:
+      type: object
+      required: [kind, endpoint]
+      properties:
+        kind: { type: string, examples: [open_redirect] }
+        endpoint: { type: string, examples: ['https://demo.test/go?next=x'] }
+        target: { type: string }
+        state: { $ref: '#/components/schemas/ExternalState' }
+        parameter: { type: string }
+        location: { type: string, enum: [query, body, header, cookie, path] }
+        severity: { type: string, enum: [critical, high, medium, low, info] }
+        confidence: { type: integer, minimum: 0, maximum: 100 }
+        title: { type: string }
+        raw_request: { type: string }
+        raw_response: { type: string }
+        curl: { type: string }
+        verdict_note: { type: string }
+        reason_code: { type: string }
+        reproduction_steps: { type: array, items: { type: string } }
+        checks:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              state: { type: string }
+        evidence:
+          type: array
+          description: 引用已上传的证据（先 POST /api/evidence 拿 id）
+          items: { $ref: '#/components/schemas/EvidenceRef' }
+        scope_id: { type: string, description: 只作为索引；服务端会按 endpoint 现算，不信任这个值 }
+        supersedes: { type: string, description: 给旧记录 id，走重开路径 }
+        reopened_reason: { type: string }
+
+    VerdictInput:
+      type: object
+      required: [state]
+      properties:
+        state: { $ref: '#/components/schemas/ExternalState' }
+        verdict_note: { type: string, description: confirmed / rejected / inconclusive 都必须写清依据 }
+        reason_code:
+          type: string
+          description: 结构化原因码，取值范围见对应 kind 的判定准则（reject_reasons / inconclusive_triggers）
+        confidence: { type: integer, minimum: 0, maximum: 100 }
+        reproduction_steps: { type: array, items: { type: string } }
+        evidence: { type: array, items: { $ref: '#/components/schemas/EvidenceRef' } }
+        curl: { type: string }
+        raw_request: { type: string }
+        raw_response: { type: string }
+        lease_token: { type: string, description: claim 拿到的租约令牌，也可以放 Lease-Token 头 }
+        checks: { type: array, items: { type: object } }
+        parameter: { type: string }
+        location: { type: string }
+        severity: { type: string }
+
+    EvidenceRef:
+      type: object
+      properties:
+        id: { type: string, description: 服务端发的 evidence id }
+        sha256: { type: string, description: 和服务端存的一致，不一致直接 422 }
+
+    Evidence:
+      type: object
+      properties:
+        id: { type: string }
+        sha256: { type: string }
+        size: { type: integer }
+        content_type: { type: string }
+        kind: { type: string }
+        note: { type: string }
+        filename: { type: string }
+        agent_name: { type: string }
+        digest_verified: { type: boolean, description: 落盘回读校验是否通过 }
+        hash_method: { type: string, enum: [sha256sum, shasum, certutil, js-readback, js, unavailable] }
+        file_url: { type: string, description: 控制台里可直接打开的文件地址 }
+        download_url: { type: string }
+        created: { type: string, format: date-time }
+
+    Scope:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        assets:
+          type: array
+          items:
+            type: object
+            properties:
+              type: { type: string, enum: [domain, ip_cidr, url_prefix, ip] }
+              value: { type: string }
+        status: { type: string, enum: [active, expired, revoked, ''] }
+        active: { type: boolean, description: 综合 status 与时效后的结果 }
+        authorized_at: { type: [string, 'null'], format: date-time }
+        expires_at: { type: [string, 'null'], format: date-time }
+        authorization_reference: { type: string, description: 授权依据（合同号 / 工单号 / 邮件标题） }
+        note: { type: string }
+
+    ScopeHop:
+      type: object
+      properties:
+        url: { type: string }
+        normalized: { type: string }
+        in_scope: { type: boolean }
+        reason: { type: string, enum: [no_matching_asset, scope_inactive, target_out_of_scope, scope_not_found, ''] }
+        scope_id: { type: string }
+        matched_asset:
+          type: [object, 'null']
+          properties:
+            type: { type: string }
+            value: { type: string }
+
+    Rubric:
+      type: object
+      properties:
+        kind: { type: string }
+        title: { type: string }
+        category: { type: string }
+        enforce: { type: boolean, description: true 时违反准则直接 422 拒收 }
+        min_confidence: { type: integer }
+        confirm_checks: { type: array, items: { type: string } }
+        confirm_evidence_kinds: { type: array, items: { type: string } }
+        reject_reasons: { type: array, items: { type: string } }
+        inconclusive_triggers: { type: array, items: { type: string } }
+        note: { type: string, description: 中文判据（门槛写成结构化字段，这段是给人看的解释） }
+
+    RubricIssue:
+      type: object
+      properties:
+        code:
+          type: string
+          examples: [RUBRIC_MISSING_EVIDENCE, RUBRIC_LOW_CONFIDENCE, RUBRIC_CHECK_FAILED]
+        message: { type: string }
+        rubric: { type: string }
+        data: { type: object }
+
+    Error:
+      type: object
+      required: [status, code, message]
+      properties:
+        contract_version: { type: integer, const: 2 }
+        status: { type: integer }
+        code:
+          type: string
+          description: |
+            错误码清单（稳定，不要按 message 判断）：
+            UNAUTHORIZED / AGENT_KEY_INVALID / AGENT_DISABLED / PERMISSION_DENIED /
+            OUT_OF_SCOPE / SCOPE_EXPIRED / SCOPE_NOT_FOUND /
+            VALIDATION_FAILED / INVALID_STATE / INVALID_STATE_TRANSITION / INVALID_ENDPOINT /
+            RUBRIC_VIOLATION / EVIDENCE_NOT_FOUND / EVIDENCE_HASH_MISMATCH /
+            IDEMPOTENCY_KEY_REQUIRED / IDEMPOTENCY_CONFLICT /
+            ALREADY_CLAIMED / LEASE_EXPIRED / NO_LEASE / ALREADY_FINAL /
+            TERMINAL_IMMUTABLE / ALREADY_SUPERSEDED /
+            PRECONDITION_REQUIRED / PRECONDITION_FAILED / RATE_LIMITED /
+            DIGEST_REQUIRED / DIGEST_INVALID / DIGEST_MISMATCH / MISSING_FILE /
+            CONTRACT_VERSION_UNSUPPORTED
+        message: { type: string, description: 中文人话说明 }
+        data: { type: object, description: '机器可读的补充（例如 current_etag / retry_after / allowed）' }

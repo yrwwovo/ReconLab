@@ -1,0 +1,1461 @@
+[
+ {
+  "name": "targets",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "name",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "value",
+    "type": "text",
+    "required": true,
+    "max": 400
+   },
+   {
+    "name": "kind",
+    "type": "select",
+    "values": [
+     "domain",
+     "ip",
+     "url",
+     "cidr"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "scope",
+    "type": "select",
+    "values": [
+     "in",
+     "out"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "tags",
+    "type": "text",
+    "max": 300
+   },
+   {
+    "name": "note",
+    "type": "text",
+    "max": 2000
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "workers",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "name",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "hostname",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "os",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "version",
+    "type": "text",
+    "max": 60
+   },
+   {
+    "name": "caps",
+    "type": "text",
+    "max": 400
+   },
+   {
+    "name": "status",
+    "type": "select",
+    "values": [
+     "online",
+     "idle",
+     "offline"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "last_seen",
+    "type": "date"
+   },
+   {
+    "name": "current_scan",
+    "type": "text",
+    "max": 120
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "scans",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "name",
+    "type": "text",
+    "max": 240
+   },
+   {
+    "name": "kind",
+    "type": "select",
+    "values": [
+     "subdomain",
+     "port",
+     "http",
+     "dir",
+     "vuln",
+     "poc"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "target",
+    "type": "relation",
+    "collectionId": "targets",
+    "maxSelect": 1
+   },
+   {
+    "name": "args",
+    "type": "text",
+    "max": 4000
+   },
+   {
+    "name": "status",
+    "type": "select",
+    "values": [
+     "queued",
+     "running",
+     "done",
+     "failed",
+     "canceled"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "progress",
+    "type": "number"
+   },
+   {
+    "name": "message",
+    "type": "text",
+    "max": 600
+   },
+   {
+    "name": "log",
+    "type": "text",
+    "max": 40000
+   },
+   {
+    "name": "worker",
+    "type": "relation",
+    "collectionId": "workers",
+    "maxSelect": 1
+   },
+   {
+    "name": "stats",
+    "type": "text",
+    "max": 4000
+   },
+   {
+    "name": "started",
+    "type": "date"
+   },
+   {
+    "name": "finished",
+    "type": "date"
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "assets",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "scan",
+    "type": "relation",
+    "collectionId": "scans",
+    "maxSelect": 1
+   },
+   {
+    "name": "target",
+    "type": "relation",
+    "collectionId": "targets",
+    "maxSelect": 1
+   },
+   {
+    "name": "host",
+    "type": "text",
+    "max": 300
+   },
+   {
+    "name": "port",
+    "type": "number"
+   },
+   {
+    "name": "service",
+    "type": "text",
+    "max": 80
+   },
+   {
+    "name": "banner",
+    "type": "text",
+    "max": 1000
+   },
+   {
+    "name": "title",
+    "type": "text",
+    "max": 500
+   },
+   {
+    "name": "tech",
+    "type": "text",
+    "max": 400
+   },
+   {
+    "name": "status_code",
+    "type": "number"
+   },
+   {
+    "name": "url",
+    "type": "text",
+    "max": 600
+   },
+   {
+    "name": "tls",
+    "type": "text",
+    "max": 600
+   },
+   {
+    "name": "raw",
+    "type": "text",
+    "max": 6000
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "pocs",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "name",
+    "type": "text",
+    "required": true,
+    "max": 200
+   },
+   {
+    "name": "category",
+    "type": "text",
+    "max": 120
+   },
+   {
+    "name": "severity",
+    "type": "select",
+    "values": [
+     "critical",
+     "high",
+     "medium",
+     "low",
+     "info"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "description",
+    "type": "text",
+    "max": 2000
+   },
+   {
+    "name": "method",
+    "type": "select",
+    "values": [
+     "GET",
+     "POST",
+     "PUT",
+     "HEAD",
+     "OPTIONS"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "path",
+    "type": "text",
+    "max": 500
+   },
+   {
+    "name": "headers",
+    "type": "text",
+    "max": 4000
+   },
+   {
+    "name": "body",
+    "type": "text",
+    "max": 6000
+   },
+   {
+    "name": "matchers",
+    "type": "text",
+    "max": 4000
+   },
+   {
+    "name": "enabled",
+    "type": "bool"
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "findings",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "title",
+    "type": "text",
+    "required": true,
+    "max": 300
+   },
+   {
+    "name": "severity",
+    "type": "select",
+    "values": [
+     "critical",
+     "high",
+     "medium",
+     "low",
+     "info"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "status",
+    "type": "select",
+    "values": [
+     "new",
+     "confirmed",
+     "false_positive",
+     "fixed"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "category",
+    "type": "text",
+    "max": 120
+   },
+   {
+    "name": "target",
+    "type": "relation",
+    "collectionId": "targets",
+    "maxSelect": 1
+   },
+   {
+    "name": "scan",
+    "type": "relation",
+    "collectionId": "scans",
+    "maxSelect": 1
+   },
+   {
+    "name": "asset",
+    "type": "relation",
+    "collectionId": "assets",
+    "maxSelect": 1
+   },
+   {
+    "name": "poc",
+    "type": "relation",
+    "collectionId": "pocs",
+    "maxSelect": 1
+   },
+   {
+    "name": "url",
+    "type": "text",
+    "max": 800
+   },
+   {
+    "name": "parameter",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "payload",
+    "type": "text",
+    "max": 1000
+   },
+   {
+    "name": "request",
+    "type": "text",
+    "max": 8000
+   },
+   {
+    "name": "response",
+    "type": "text",
+    "max": 8000
+   },
+   {
+    "name": "evidence",
+    "type": "text",
+    "max": 3000
+   },
+   {
+    "name": "confidence",
+    "type": "number"
+   },
+   {
+    "name": "cvss",
+    "type": "number"
+   },
+   {
+    "name": "cve",
+    "type": "text",
+    "max": 120
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "reports",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "title",
+    "type": "text",
+    "required": true,
+    "max": 300
+   },
+   {
+    "name": "target",
+    "type": "relation",
+    "collectionId": "targets",
+    "maxSelect": 1
+   },
+   {
+    "name": "summary",
+    "type": "text",
+    "max": 500
+   },
+   {
+    "name": "content",
+    "type": "text",
+    "max": 200000
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "review_queue",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "finding",
+    "type": "relation",
+    "collectionId": "findings",
+    "maxSelect": 1
+   },
+   {
+    "name": "target",
+    "type": "relation",
+    "collectionId": "targets",
+    "maxSelect": 1
+   },
+   {
+    "name": "scan",
+    "type": "relation",
+    "collectionId": "scans",
+    "maxSelect": 1
+   },
+   {
+    "name": "rule_id",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "title",
+    "type": "text",
+    "max": 300
+   },
+   {
+    "name": "url",
+    "type": "text",
+    "max": 800
+   },
+   {
+    "name": "parameter",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "severity",
+    "type": "select",
+    "values": [
+     "critical",
+     "high",
+     "medium",
+     "low",
+     "info"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "state",
+    "type": "select",
+    "values": [
+     "new",
+     "normalized",
+     "awaiting_human",
+     "auto_verified",
+     "confirmed",
+     "rejected",
+     "uncertain",
+     "retest"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "origin",
+    "type": "select",
+    "values": [
+     "scanner",
+     "agent",
+     "manual"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "agent_name",
+    "type": "text",
+    "max": 120
+   },
+   {
+    "name": "confidence",
+    "type": "number"
+   },
+   {
+    "name": "tier",
+    "type": "select",
+    "values": [
+     "confirmed",
+     "suspect",
+     "noise"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "dedup_hash",
+    "type": "text",
+    "max": 160
+   },
+   {
+    "name": "instances",
+    "type": "number"
+   },
+   {
+    "name": "evidence",
+    "type": "text",
+    "max": 20000
+   },
+   {
+    "name": "raw_request",
+    "type": "text",
+    "max": 12000
+   },
+   {
+    "name": "raw_response",
+    "type": "text",
+    "max": 12000
+   },
+   {
+    "name": "curl",
+    "type": "text",
+    "max": 4000
+   },
+   {
+    "name": "verdict",
+    "type": "select",
+    "values": [
+     "confirmed",
+     "false_positive",
+     "uncertain",
+     "need_retest"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "verdict_note",
+    "type": "text",
+    "max": 4000
+   },
+   {
+    "name": "fp_pattern",
+    "type": "text",
+    "max": 600
+   },
+   {
+    "name": "checks",
+    "type": "text",
+    "max": 6000
+   },
+   {
+    "name": "attempts",
+    "type": "number"
+   },
+   {
+    "name": "reviewer",
+    "type": "text",
+    "max": 120
+   },
+   {
+    "name": "verified_at",
+    "type": "date"
+   },
+   {
+    "name": "queue_order",
+    "type": "number"
+   },
+   {
+    "name": "endpoint",
+    "type": "text",
+    "max": 1000
+   },
+   {
+    "name": "endpoint_norm",
+    "type": "text",
+    "max": 1000
+   },
+   {
+    "name": "location",
+    "type": "select",
+    "values": [
+     "query",
+     "body",
+     "header",
+     "cookie",
+     "path"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "scope",
+    "type": "relation",
+    "collectionId": "scopes",
+    "maxSelect": 1,
+    "cascadeDelete": false
+   },
+   {
+    "name": "evidence_ids",
+    "type": "json",
+    "maxSize": 200000
+   },
+   {
+    "name": "reproduction_steps",
+    "type": "json",
+    "maxSize": 100000
+   },
+   {
+    "name": "rev",
+    "type": "number"
+   },
+   {
+    "name": "content_stamp",
+    "type": "text",
+    "max": 100
+   },
+   {
+    "name": "lease_token",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "lease_expires_at",
+    "type": "date"
+   },
+   {
+    "name": "claimed_by",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "heartbeat_at",
+    "type": "date"
+   },
+   {
+    "name": "supersedes",
+    "type": "text",
+    "max": 40
+   },
+   {
+    "name": "superseded_by",
+    "type": "text",
+    "max": 40
+   },
+   {
+    "name": "reopened_reason",
+    "type": "text",
+    "max": 1000
+   },
+   {
+    "name": "contract_note",
+    "type": "text",
+    "max": 2000
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "fp_fingerprints",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "rule_id",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "url_pattern",
+    "type": "text",
+    "max": 600
+   },
+   {
+    "name": "resp_sig",
+    "type": "text",
+    "max": 300
+   },
+   {
+    "name": "reason",
+    "type": "text",
+    "max": 2000
+   },
+   {
+    "name": "hits",
+    "type": "number"
+   },
+   {
+    "name": "penalty",
+    "type": "number"
+   },
+   {
+    "name": "source",
+    "type": "select",
+    "values": [
+     "human",
+     "agent",
+     "auto"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "enabled",
+    "type": "bool"
+   },
+   {
+    "name": "last_hit",
+    "type": "date"
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "rule_stats",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "rule_id",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "poc_name",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "hits",
+    "type": "number"
+   },
+   {
+    "name": "confirmed",
+    "type": "number"
+   },
+   {
+    "name": "rejected",
+    "type": "number"
+   },
+   {
+    "name": "uncertain",
+    "type": "number"
+   },
+   {
+    "name": "precision",
+    "type": "number"
+   },
+   {
+    "name": "state",
+    "type": "select",
+    "values": [
+     "active",
+     "watch",
+     "downweighted",
+     "retired"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "note",
+    "type": "text",
+    "max": 2000
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "agents",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "name",
+    "type": "text",
+    "required": true,
+    "max": 120
+   },
+   {
+    "name": "identity",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "scopes",
+    "type": "text",
+    "max": 400
+   },
+   {
+    "name": "status",
+    "type": "select",
+    "values": [
+     "online",
+     "idle",
+     "offline",
+     "revoked"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "mode",
+    "type": "select",
+    "values": [
+     "verifier",
+     "collector",
+     "both"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "ingested",
+    "type": "number"
+   },
+   {
+    "name": "verified",
+    "type": "number"
+   },
+   {
+    "name": "last_seen",
+    "type": "date"
+   },
+   {
+    "name": "note",
+    "type": "text",
+    "max": 2000
+   },
+   {
+    "name": "api_key_hash",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "key_prefix",
+    "type": "text",
+    "max": 60
+   },
+   {
+    "name": "key_created",
+    "type": "date"
+   },
+   {
+    "name": "key_last_used",
+    "type": "date"
+   },
+   {
+    "name": "requests",
+    "type": "number"
+   },
+   {
+    "name": "rejected",
+    "type": "number"
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "scopes",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "name",
+    "type": "text",
+    "required": true,
+    "max": 200
+   },
+   {
+    "name": "assets",
+    "type": "json",
+    "maxSize": 200000
+   },
+   {
+    "name": "status",
+    "type": "select",
+    "values": [
+     "active",
+     "expired",
+     "revoked"
+    ],
+    "maxSelect": 1
+   },
+   {
+    "name": "authorized_at",
+    "type": "date"
+   },
+   {
+    "name": "expires_at",
+    "type": "date"
+   },
+   {
+    "name": "authorization_reference",
+    "type": "text",
+    "max": 500
+   },
+   {
+    "name": "note",
+    "type": "text",
+    "max": 2000
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "evidence",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": null,
+  "updateRule": null,
+  "deleteRule": null,
+  "fields": [
+   {
+    "name": "file",
+    "type": "file",
+    "maxSelect": 1,
+    "maxSize": 26214400,
+    "thumbs": [],
+    "protected": false
+   },
+   {
+    "name": "sha256",
+    "type": "text",
+    "max": 100
+   },
+   {
+    "name": "size",
+    "type": "number"
+   },
+   {
+    "name": "content_type",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "kind",
+    "type": "text",
+    "max": 120
+   },
+   {
+    "name": "note",
+    "type": "text",
+    "max": 2000
+   },
+   {
+    "name": "agent_name",
+    "type": "text",
+    "max": 120
+   },
+   {
+    "name": "original_name",
+    "type": "text",
+    "max": 400
+   },
+   {
+    "name": "digest_verified",
+    "type": "bool"
+   },
+   {
+    "name": "hash_method",
+    "type": "text",
+    "max": 60
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "decision_rubrics",
+  "type": "base",
+  "listRule": "@request.auth.id != ''",
+  "viewRule": "@request.auth.id != ''",
+  "createRule": "@request.auth.id != ''",
+  "updateRule": "@request.auth.id != ''",
+  "deleteRule": "@request.auth.id != ''",
+  "fields": [
+   {
+    "name": "rule_id",
+    "type": "text",
+    "required": true,
+    "max": 120
+   },
+   {
+    "name": "title",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "category",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "enforce",
+    "type": "bool"
+   },
+   {
+    "name": "min_confidence",
+    "type": "number"
+   },
+   {
+    "name": "confirm_checks",
+    "type": "json",
+    "maxSize": 20000
+   },
+   {
+    "name": "confirm_evidence_kinds",
+    "type": "json",
+    "maxSize": 20000
+   },
+   {
+    "name": "reject_reasons",
+    "type": "json",
+    "maxSize": 20000
+   },
+   {
+    "name": "inconclusive_triggers",
+    "type": "json",
+    "maxSize": 20000
+   },
+   {
+    "name": "note",
+    "type": "text",
+    "max": 5000
+   },
+   {
+    "name": "enabled",
+    "type": "bool"
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "contract_audit",
+  "type": "base",
+  "listRule": null,
+  "viewRule": null,
+  "createRule": null,
+  "updateRule": null,
+  "deleteRule": null,
+  "fields": [
+   {
+    "name": "event",
+    "type": "text",
+    "max": 60
+   },
+   {
+    "name": "action",
+    "type": "text",
+    "max": 60
+   },
+   {
+    "name": "status",
+    "type": "number"
+   },
+   {
+    "name": "agent_name",
+    "type": "text",
+    "max": 120
+   },
+   {
+    "name": "item_id",
+    "type": "text",
+    "max": 40
+   },
+   {
+    "name": "scope_id",
+    "type": "text",
+    "max": 40
+   },
+   {
+    "name": "code",
+    "type": "text",
+    "max": 60
+   },
+   {
+    "name": "detail",
+    "type": "text",
+    "max": 2000
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "idempotency_keys",
+  "type": "base",
+  "listRule": null,
+  "viewRule": null,
+  "createRule": null,
+  "updateRule": null,
+  "deleteRule": null,
+  "fields": [
+   {
+    "name": "agent",
+    "type": "text",
+    "max": 40
+   },
+   {
+    "name": "idem_key",
+    "type": "text",
+    "max": 220
+   },
+   {
+    "name": "endpoint",
+    "type": "text",
+    "max": 200
+   },
+   {
+    "name": "request_hash",
+    "type": "text",
+    "max": 100
+   },
+   {
+    "name": "status",
+    "type": "number"
+   },
+   {
+    "name": "response",
+    "type": "json",
+    "maxSize": 2000000
+   },
+   {
+    "name": "expires_at",
+    "type": "date"
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ },
+ {
+  "name": "rate_buckets",
+  "type": "base",
+  "listRule": null,
+  "viewRule": null,
+  "createRule": null,
+  "updateRule": null,
+  "deleteRule": null,
+  "fields": [
+   {
+    "name": "bucket",
+    "type": "text",
+    "max": 80
+   },
+   {
+    "name": "agent",
+    "type": "text",
+    "max": 40
+   },
+   {
+    "name": "agent_name",
+    "type": "text",
+    "max": 120
+   },
+   {
+    "name": "window_start",
+    "type": "number"
+   },
+   {
+    "name": "count",
+    "type": "number"
+   },
+   {
+    "name": "created",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": false
+   },
+   {
+    "name": "updated",
+    "type": "autodate",
+    "onCreate": true,
+    "onUpdate": true
+   }
+  ]
+ }
+]
